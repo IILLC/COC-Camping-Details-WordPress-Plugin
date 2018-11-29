@@ -240,7 +240,7 @@ function coc_cg_details( $atts = NULL ) {
 								foreach ( $localCampgrounds as $lc ) {
 									echo '<a href="'.$lc->reserve_url.'" target="_blank" ><strong>'.$lc->coc_campground_name.'</strong> <i class="fa fa-external-link"></i></a>';
 									echo '&nbsp &nbsp &nbsp';
-									if (!empty($lc->review_url)){
+									if ( !empty( $lc->review_url ) ){
 										echo '<i class="fa fa-hand-o-right" aria-hidden="true"></i> <a href="..'.$lc->review_url.'">Read our camping review! <i class="fa fa-file-text-o"></i></a>';
 									}
 									echo '</br >';

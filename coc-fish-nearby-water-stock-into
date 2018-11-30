@@ -1,0 +1,370 @@
+<?php
+
+//////////////file for Nearby Water info for Camping data
+
+function cocstock_enqueue() {
+    wp_enqueue_script( 'coc_stocking_js', plugins_url( '/js/coc-fish-stocking.js', __FILE__ ) );
+    wp_localize_script( 'coc_stocking_js', 'my_ajax_object', array( 'ajax_url' => admin_url( 'admin-ajax.php' ) ) );
+}
+add_action( 'wp_enqueue_scripts', 'cocstock_enqueue' );
+
+//function to get stocking information either immediately or through ajax
+function getStockInfo ( $waterName, $stockDate, $numb ) {
+	global $wpdb;
+	//vars for search
+	$byName = 0;
+	  if ( empty( $waterName ) || $waterName == "All" ) {
+		  $waterName = "%";
+	  } else {
+		  $waterName = $waterName;
+		  $byName = 1;
+		  $searchString = $waterName;
+	  }
+	  
+	  if ( empty( $stockDate ) ) {
+		  //find most recent date stocked
+		  $dateSQL = "
+		  Select
+			coc_water_stock_date.stocked_date
+		  From
+			coc_water_stock_date
+		  Order By
+			coc_water_stock_date.stocked_date Desc
+		  Limit 1";
+		  $stockDate = $wpdb->get_var( $dateSQL );
+		  
+	  } else {
+		  $stockDate = $stockDate;
+	  }
+	if ( $byName == 1 ) {
+		//search by name
+		$whereClauseSQL = "coc_water_stock_date.stocked_date <= '$stockDate'
+							AND coc_water_details.water_name LIKE '%$waterName%'";
+	} else { 
+		// search by date
+		$searchString = $stockDate;
+		$whereClauseSQL = "coc_water_stock_date.stocked_date <= '$stockDate'";
+	}
+
+	if ( empty( $numb ) ){ 
+		//defaults to 25 records
+		$numb = 25;
+	}
+
+	//then need to output most recent stocking info
+	$stockListSQL = "
+	SELECT
+	  coc_water_details.water_name,
+	  coc_water_details.idcoc_water_details,
+	  coc_camp_regions.coc_camp_region_name,
+	  coc_water_stock_date.stocked_date,
+	  coc_camp_regions.map_url,
+	  coc_water_details.fishing_atlas_url,
+	  coc_water_details.review_url
+	FROM
+	  coc_water_stock_date
+	  INNER JOIN coc_water_details ON coc_water_details.idcoc_water_details = coc_water_stock_date.water_id
+	  INNER JOIN coc_camp_regions ON coc_camp_regions.idcoc_camp_regions = coc_water_details.region_id
+	Where
+	  $whereClauseSQL
+	ORDER BY
+	  coc_water_stock_date.stocked_date DESC,
+	  coc_camp_regions.coc_camp_region_name,
+	  coc_water_details.water_name
+	 LIMIT  $numb";
+	$stockResults = $wpdb->get_results( $stockListSQL );
+	
+	return $stockResults;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+add_action( 'wp_ajax_stockInfoAJAX', 'stockInfoAJAX_callback' );
+add_action( 'wp_ajax_nopriv_stockInfoAJAX', 'stockInfoAJAX_callback' );
+
+function stockInfoAJAX_callback( $waterName = NULL, $stockDate = NULL, $numb = NULL ) {
+	global $wpdb;
+	
+	//get var info
+	$waterName = $_POST['waterName'];
+	$stockDate = $_POST['stockDate'];
+	$numb = $_POST['numb'];
+
+	if( $waterName != "All" ){
+		$nameSearch = "Yes"; //seached by name so display dates. 
+	} else {
+		$nameSearch = "Date";
+	}
+	
+	if ( empty( $numb ) ){ //defaults to 25 records
+		$numb = 25;
+	}
+	
+	$stockResults = getStockInfo ( $waterName, $stockDate, $numb );
+	
+	$stockingTableHTML = stockTableHTML ($stockResults, $nameSearch);
+	
+	echo $stockingTableHTML;
+	
+	wp_die();
+}	
+
+//Register Shortcode: [coc_stocking_report]
+add_shortcode( 'coc_stocking_report', 'coc_stocking_report' );
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/////////////////////////////Build HTML Stocking Table HERE///////////////////////////////////////////
+function stockTableHTML ( $stockResults, $nameSearch ){
+	
+	ob_start();
+	
+	if ( empty($stockResults ) ){ ?>
+		<h3>No Results found. Try another search.</h3>
+            
+<?php     
+	} else {
+?>
+
+		<div>
+<?php 	$regionName = "";
+		foreach ( $stockResults as $sr ) { 
+			if ( $regionName != $sr->coc_camp_region_name ) {
+				$regionName = $sr->coc_camp_region_name; 
+?>
+				<h3><?php echo $regionName ?>
+                	<a href="<?php echo $sr->map_url ?>" title="View the <?php echo $sr->coc_camp_region_name ?>" target="new" rel="nofollow"><i class="fa fa-external-link"></i></a></h3>				
+<?php                
+			}
+		
+		?>        
+			
+			<div class="row-fluid">
+				<div class="span2">
+					<?php echo $sr->stocked_date?>
+				</div>
+                <div class="span6">
+					<?php echo $sr->water_name ?> 
+                    <a href="<?php echo $sr->fishing_atlas_url ?>" title="Find detailed information in the Fishing Atlas." target="new" rel="nofollow"><i class="fa fa-info-circle" aria-hidden="true"></i></a>
+<?php
+					$stockedCondition = coc_stocked_lvl( $sr->idcoc_water_details );
+					echo ' '.$stockedCondition.' ';
+?>                    
+                    
+                    </div>
+				
+				<div class="span4">
+<?php 				
+					if ( !empty( $sr->review_url ) ){ 
+?>
+						<a href="~/../..<?php echo $sr->review_url ?>" title="<?php echo $sr->water_name ?>" target="new" >Read our camping review!   <i class="fa fa-file-text-o"></i></a> 	
+<?php
+					}
+
+?>
+                </div>
+			</div>
+
+<?php 	
+		} //end foreach
+	} //end if empty 
+?>            
+		</div>
+<?php 
+   return ob_get_clean();     
+}
+
+//calback function here SHORTCODE function here
+function coc_stocking_report( $atts = NULL ) { 
+	global $wpdb;
+
+	$stockResults = getStockInfo ( $waterName, $stockDate, $numb );
+
+	$stockDateListSQL="
+	Select distinct
+	  coc_water_stock_date.stocked_date
+	From
+	  coc_water_stock_date
+	Order By
+	  coc_water_stock_date.stocked_date Desc
+	  Limit 25";
+	$stockDateListResults = $wpdb->get_col($stockDateListSQL);
+	
+
+//need to be able to sort results - Name - Region - Date		  
+//starts echo of HTML block back to WP
+
+	ob_start();	  
+?>	
+
+<div class="alert alert-info" role="alert">
+	<h3>Fish Stocking Report Filtering</h3>
+		<div class="row-fluid">
+        	<form>
+			<div class="span6">Name: <input id="txbxWaterName" name="txbxWaterName" style="width:75%" type="text" value="All" placeholder="All" class="form-control" title="Enter some or all of the name of the water you wish to search for."/></strong></div>
+            <div class="span4">Date: <select id="slctStockDates" name="slctStockDates" class="form-control" style="width:70%" title="Select a specific date to see what was stocked with fish on that date.">
+<?php
+			foreach ( $stockDateListResults as $s ) { 
+              	echo '<option value="'.$s.'" '.( ( $stockDate == $s ) ? ' selected="selected">' : '>' ).$s.'</option>';
+                                        }
+?>                
+				</select></div>
+			<div class="span2">
+				<select id="slctNumb" name="slctNumb" class="form-control" style="width:75%" title="Choose how many records you would like to see.">
+					<option value="10">10</option>
+					<option value="25" selected="selected">25</option>
+					<option value="50">50</option>
+					<option value="100 ">100</option>
+				</select>
+			</div>
+	</div>
+	<div >
+            	<button id="btnSearchStock" name="btnSearchStock" class="btn btn-primary" type="submit">Search</button>
+                </form>
+            </div>
+        </div>
+	</div>
+
+	<h2>Fish Stocking Report<span id="spnFilters"></span></h2>	
+
+	<div id="fish-stocking-container" name="fish-stocking-container">
+
+    <?php echo stockTableHTML ( $stockResults, $nameSearch = "Date" ) ?>
+
+	</div> 
+    <p><strong>Note:</strong> <em>Data from Colorado Parks & Wildlife information. 2016 to Present</em></p>
+<?php 
+	  
+	  return ob_get_clean();
+
+}
+//////////////end shortcode
+
+//function to calculate a body of water's level ov being stocked. 
+function coc_stocked_lvl( $waterID ) {
+	global $wpdb;
+	
+	$nowDate = date( 'Y-m-d' );
+	
+	//get when things where stocked
+	$waterSQL = "
+	Select
+	  coc_water_stock_date.stocked_date
+	From
+	  coc_water_stock_date
+	Where
+	  coc_water_stock_date.stocked_date > Date_Sub(Now(), Interval 6 Month) And
+	  coc_water_stock_date.water_id = $waterID
+	Order By
+	  coc_water_stock_date.stocked_date Desc";
+	$waterDates = $wpdb->get_col( $waterSQL );
+	
+	if( empty( $waterDates ) ){
+		$timesStocked = 0;
+		$stockRank = 0;
+	} else {
+		$timesStocked = count( $waterDates );
+		
+		//algorithm for stocked score
+		$startStockNumb = 90 * $timesStocked;
+		$daySince = 0;
+		foreach ( $waterDates as $d ){
+			$datetime1 = date_create( $nowDate );
+			$datetime2 = date_create( $d );
+			$interval = date_diff( $datetime1, $datetime2 );
+			$daySince = $daySince + $interval->d;	
+		}
+			
+		$stockRank = $startStockNumb - $daySince;
+		
+	}
+	
+	//stocked representation
+	$fIcon = '<img src="~/../../wp-content/plugins/coc_campground-details/icons/little-fish-icon.png" >';
+	if ( $stockRank < 1 ) {
+		$stockRankString = '<span title="Not Stocked with Fish">'.$fIcon.'</span>';
+	} elseif ( $stockRank > 0 && $stockRank < 200 ) {
+		$stockRankString = '<span title="Rarely Stocked with Fish">'.$fIcon.''.$fIcon.'</span>';
+	} elseif ( $stockRank > 199 && $stockRank < 300 ) {
+		$stockRankString = '<span title="Sporadically Stocked with Fish">'.$fIcon.''.$fIcon.''.$fIcon.'</span>';
+	} elseif ( $stockRank > 299 && $stockRank < 400 ) {
+		$stockRankString = '<span title="Stocked with Fish">'.$fIcon.''.$fIcon.''.$fIcon.''.$fIcon.'</span>';
+	} elseif ( $stockRank > 399 ) {
+		$stockRankString = '<span title="Frequently Stocked with Fish">'.$fIcon.''.$fIcon.''.$fIcon.''.$fIcon.''.$fIcon.'</span>';
+	}
+	
+	return $stockRankString;
+}
+
+//longitude || cosine(0.4356376777777778)* 69.172 = 1 degree = 62.711413  || Each 0.015946 is 1 mile ||| 5 Miles ==0.079730
+//latitude ||  1° ≈ 69 miles || 1 Mile = 0.0144927536231884 || 5 Miles = 0.072463
+
+
+//code to find nearby water
+function coc_findNearbyWater ($lat, $lon) {
+	global $wpdb;
+	if (empty($lat) || empty($lon)) {
+		return NULL;
+	} else {
+		//find nearby water if any
+		$waterSQL = "
+		Select
+		  coc_water_details.idcoc_water_details,
+		  coc_water_details.water_name,
+		  coc_water_details.lat,
+		  coc_water_details.lon,
+		  coc_water_details.fishing_atlas_url,
+		  coc_water_details.review_url,
+		  (3959 * acos(cos(radians($lat)) * cos(radians(coc_water_details.lat)) *
+		  cos(radians(coc_water_details.lon) - radians($lon)) + sin(radians($lat)) *
+		  sin(radians(coc_water_details.lat)))) As distance
+		From
+		  coc_water_details
+		Group By
+		  coc_water_details.idcoc_water_details, coc_water_details.water_name,
+		  coc_water_details.lat, coc_water_details.lon
+		Having
+		  distance < 5
+		Order By
+		  distance
+		Limit 0, 5";
+		$waterResults = $wpdb->get_results( $waterSQL );
+		
+		if ( !empty( $waterResults ) ) {
+			return $waterResults;
+		} else {
+			return NULL;
+		}
+	}
+}
+
+// lets find campgrounds that are close
+//funciton to return nearby campgrounds NOT the one listed
+function coc_findNearbyCamps ($cgID, $latLoc, $lonLoc) {
+	global $wpdb;
+	$sql = "
+	SELECT
+	  coc_campground_details.idcoc_campground_details,
+	  coc_campground_details.coc_campground_name,
+	  coc_campground_details.reserve_url,
+	  coc_campground_details.review_url,
+	  (3959 * acos(cos(radians($latLoc)) * cos(radians(coc_campground_details.lat)) *
+	  cos(radians(coc_campground_details.lon) - radians($lonLoc)) + sin(radians($latLoc)) *
+	  sin(radians(coc_campground_details.lat)))) AS distance
+	FROM
+	  coc_campground_details
+	WHERE
+		coc_campground_details.idcoc_campground_details != '$cgID' 
+	HAVING
+		distance < 10
+	ORDER BY
+		distance
+	LIMIT 0, 5";
+	$campResults = $wpdb->get_results( $sql );
+	
+	if (!empty($campResults)) {
+		return $campResults;
+	} else {
+		return NULL;
+	}
+}
+
+?>

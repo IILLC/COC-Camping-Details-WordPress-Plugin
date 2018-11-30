@@ -264,5 +264,4 @@ function coc_cg_details( $atts = NULL ) {
 	}
 }
 
-
 ?>

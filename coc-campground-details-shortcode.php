@@ -79,10 +79,10 @@ function coc_cg_details( $atts = NULL ) {
 			curl_close( $ch );
 
 			//parse XML to chop
-			$xml = simplexml_load_string($result);
+			$xml = simplexml_load_string( $result );
 		
 			//don't update if no connection/loss of data
-			if  (!empty($xml)) {
+			if  ( !empty( $xml ) ) {
 				//have data, check update for specific fields
 				$campTable = 'coc_campground_details';
 				$nowDate = date( "Y-m-d H:i:s" );
@@ -90,19 +90,19 @@ function coc_cg_details( $atts = NULL ) {
 				//Driving directions Update
 				if ( !empty( $xml['drivingDirection'] ) && strlen( $xml['drivingDirection'] ) > 10){
 					$wpdb->update(
-								$campTable, 
-								array (
-									'driving_directions' => $xml['drivingDirection'],
-									'camp_updated' => $nowDate
-									),
-								array (
-									'idcoc_campground_details' => $cocResults->idcoc_campground_details
-									),
-								array (
-									'%s',
-									'%s'
-									)
-								);
+							$campTable, 
+							array (
+								'driving_directions' => $xml['drivingDirection'],
+								'camp_updated' => $nowDate
+								),
+							array (
+								'idcoc_campground_details' => $cocResults->idcoc_campground_details
+								),
+							array (
+								'%s',
+								'%s'
+								)
+							);
 				}
 				
 				if ( !empty( $xml->amenity ) ){
@@ -113,24 +113,24 @@ function coc_cg_details( $atts = NULL ) {
 					//insert Amenity List if NOT Empty
 					if ( strlen( $amList ) > 5 ) {
 						$wpdb->update(
-									$campTable, 
-									array (
-										'amenities' => $amList,
-										'camp_updated' => $nowDate
-										),
-									array (
-										'idcoc_campground_details' => $cocResults->idcoc_campground_details
-										),
-									array (
-										'%s',
-										'%s'
-										)
-									);
+								$campTable, 
+								array (
+									'amenities' => $amList,
+									'camp_updated' => $nowDate
+									),
+								array (
+									'idcoc_campground_details' => $cocResults->idcoc_campground_details
+									),
+								array (
+									'%s',
+									'%s'
+									)
+								);
 					}
 				}
 				
 				//grab updated info to use
-				$cocResults = $wpdb->get_row($sql);
+				$cocResults = $wpdb->get_row( $sql );
 				
 			}
 		}
@@ -141,7 +141,7 @@ function coc_cg_details( $atts = NULL ) {
 		$resURL = $cocResults->reserve_url;
 		$campName = $cocResults->coc_campground_name;
 		$driveDir = $cocResults->driving_directions;
-		$elevation = number_format($cocResults->elevation).' Feet';
+		$elevation = number_format( $cocResults->elevation ).' Feet';
 		$forestryName = $cocResults->coc_forestry_name;
 		$forestryURL = $cocResults->coc_forestry_url;
 		$regionName = $cocResults->coc_camp_region_name;

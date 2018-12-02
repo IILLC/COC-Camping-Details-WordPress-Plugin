@@ -1,3 +1,7 @@
+SoCo-Tracking-Plugin
+WordPress plugin to add donation and expense tracking.
+See it action here: http://www.campoutcolorado.com/chapman-dam-campground-camping-review/
+
 === Camp Out Colorado Camping and Stocking Info ===
 Contributors: Troy Whitney
 Requires at least: 4.9.8
@@ -6,8 +10,6 @@ Requires PHP: 7.0
 Stable tag: 1.0.0
 License: Copyright CampOutColorado.com
 License URI: http://www.campoutcolorado.com/
-
-See it action here: http://www.campoutcolorado.com/chapman-dam-campground-camping-review/
 
 Adds campground and fish stocking information to CampOutColorado.com
 

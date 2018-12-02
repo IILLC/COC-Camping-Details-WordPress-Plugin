@@ -7,6 +7,8 @@ Stable tag: 1.0.0
 License: Copyright CampOutColorado.com
 License URI: http://www.campoutcolorado.com/
 
+See it action here: http://www.campoutcolorado.com/chapman-dam-campground-camping-review/
+
 Adds campground and fish stocking information to CampOutColorado.com
 
 == Description ==
